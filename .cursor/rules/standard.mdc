@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+Avoid using magic numbers, use variable names instead. E.g. rather BATCH_SIZE than '36' 
