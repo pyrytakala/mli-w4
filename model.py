@@ -1,17 +1,15 @@
-import transformers
-from data import get_flickr_dataloader
-import torch
 
-clip_model = transformers.CLIPModel.from_pretrained('openai/clip-vit-base-patch32')
-image_encoder = clip_model.vision_model
+# image embeddings:
+#   use all but last layer from CLIP (see clip_emb_demo.py)
+#   add one linear projection layer 768 -> 512 (the text embeddings are 512 in dimension)
 
-dataloader = get_flickr_dataloader(batch_size=1)
-images, captions = next(iter(dataloader))
+# text embeddings:
+#   use embeddings from CLIP's text model (see clip_emb_demo.py)
 
-with torch.no_grad():
-    output = image_encoder(images)
-    last_hidden_state = output.last_hidden_state
+# decoder logic:
+#     if image patch, encode with image encoder (see clip_emb_demo.py)
+#     else, encode with text encoder
+#     pass through decoder
 
-print(f"Last hidden state shape: {last_hidden_state.shape}")
-print(f"Last hidden state (first element): {last_hidden_state[0]}")
-print(f"Caption: {captions[0]}")
+
+
