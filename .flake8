@@ -1,5 +1,5 @@
 [flake8]
 max-line-length = 160
 
-# Ignore "Type of x is unknown" warnings
-disable = E0611
+# Ignore "Type of x is unknown" warnings, and blank line contains whitespace
+disable = E0611,E0602,W293

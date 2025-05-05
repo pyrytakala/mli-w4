@@ -20,14 +20,13 @@ import transformers
 from typing import Optional, Tuple
 from constants import (
     IMAGE_CHANNELS, IMAGE_SIZE, CLIP_HIDDEN_SIZE, EMBEDDING_SIZE,
-    NUM_HEADS, FEEDFORWARD_DIM, NUM_DECODER_LAYERS, CLIP_MODEL_NAME, START_TOKEN
+    NUM_HEADS, FEEDFORWARD_DIM, NUM_DECODER_LAYERS, CLIP_MODEL_NAME, START_TOKEN, END_TOKEN
 )
 
 class ImageCaptionModel(nn.Module):
     def __init__(self, clip_model_name: str = CLIP_MODEL_NAME):
         super().__init__()
         
-        # Load CLIP model
         self.clip_model = transformers.CLIPModel.from_pretrained(clip_model_name)
         
         # Image encoder (using all but last layer from CLIP)
@@ -60,22 +59,22 @@ class ImageCaptionModel(nn.Module):
         
         Args:
             images: Input images of shape (batch_size, channels, height, width)
-        
+
         Returns:
             Image features of shape (batch_size, seq_len, embedding_size)
         """
-        
+
         with torch.no_grad():
             # CLIP vision model outputs (batch_size, seq_len, hidden_size)
             vision_output = self.image_encoder(images)
             print(f"Vision model output shape: {vision_output.last_hidden_state.shape}")
             image_features = vision_output.last_hidden_state
-        
+
         # Project to (batch_size, seq_len, embedding_size)
         projected_features = self.image_projection(image_features)
         print(f"Projected features shape: {projected_features.shape}")
         return projected_features
-    
+
     def encode_text(self, text_tokens: torch.Tensor) -> torch.Tensor:
         """
         Encode text tokens using CLIP's text model.
@@ -87,7 +86,7 @@ class ImageCaptionModel(nn.Module):
             Text embeddings of shape (batch_size, seq_len, embedding_size)
         """
         return self.text_embeddings(text_tokens)
-    
+
     def forward(
         self,
         images: torch.Tensor,
@@ -105,11 +104,6 @@ class ImageCaptionModel(nn.Module):
         Returns:
             Logits for next token prediction, shape (batch_size, seq_len, vocab_size)
         """
-        # Debug input shapes
-        print(f"Forward input images shape: {images.shape}")
-        if text_tokens is not None:
-            print(f"Forward input text_tokens shape: {text_tokens.shape}")
-        
         # Encode image: (batch_size, seq_len, embedding_size)
         image_features = self.encode_image(images)
         
@@ -121,13 +115,7 @@ class ImageCaptionModel(nn.Module):
             text_features = self.encode_text(text_tokens)
             
             # Ensure batch sizes match
-            if text_features.size(0) != image_features.size(0):
-                # Repeat text features to match image batch size
-                repeat_factor = image_features.size(0) // text_features.size(0)
-                if repeat_factor > 0:
-                    text_features = text_features.repeat(repeat_factor, 1, 1)
-                else:
-                    raise ValueError(f"Invalid batch sizes: text_features {text_features.size(0)}, image_features {image_features.size(0)}")
+            assert text_features.size(0) == image_features.size(0), f"Text features batch size {text_features.size(0)} != image features batch size {image_features.size(0)}"
             
             decoder_input = text_features
         
@@ -136,35 +124,20 @@ class ImageCaptionModel(nn.Module):
             seq_len = decoder_input.size(1)
             tgt_mask = nn.Transformer.generate_square_subsequent_mask(seq_len).to(decoder_input.device)
 
-        
         # Ensure no empty tensors
         if decoder_input.numel() == 0 or image_features.numel() == 0:
             raise ValueError("Empty tensors detected in decoder input or image features")
         
-        # Process each batch element separately
-        batch_size = decoder_input.size(0)
-        decoder_outputs = []
-        
-        for i in range(batch_size):
-            # Get single image and text features
-            single_image_features = image_features[i:i+1]  # Keep batch dimension
-            single_decoder_input = decoder_input[i:i+1]    # Keep batch dimension
-            
-            # Decode: (1, seq_len, embedding_size)
-            single_output = self.decoder(
-                tgt=single_decoder_input,      # (1, seq_len, embedding_size)
-                memory=single_image_features,  # (1, seq_len, embedding_size)
-                tgt_mask=tgt_mask             # (seq_len, seq_len)
-            )
-            decoder_outputs.append(single_output)
-        
-        # Combine outputs: (batch_size, seq_len, embedding_size)
-        decoder_output = torch.cat(decoder_outputs, dim=0)
+        decoder_output = self.decoder(
+            tgt=decoder_input,      # (batch_size, seq_len, embedding_size)
+            memory=image_features,  # (batch_size, seq_len, embedding_size)
+            tgt_mask=tgt_mask      # (seq_len, seq_len)
+        )
         
         # Output layer: (batch_size, seq_len, vocab_size)
         logits = self.output_layer(decoder_output)
         return logits
-    
+
     def generate(
         self,
         images: torch.Tensor,
@@ -185,8 +158,6 @@ class ImageCaptionModel(nn.Module):
         batch_size = images.shape[0]
         device = images.device
         
-        # Start with image features: (batch_size, seq_len, embedding_size)
-        image_features = self.encode_image(images)
         
         # Initialize with start token: (batch_size, 1)
         start_token = self.tokenizer.encode(START_TOKEN, add_special_tokens=False)[0]
@@ -208,7 +179,7 @@ class ImageCaptionModel(nn.Module):
             tokens = torch.cat([tokens, next_token], dim=1)
             
             # Stop if we hit end token
-            if (next_token == self.tokenizer.encode("<|endoftext|>", add_special_tokens=False)[0]).any():
+            if (next_token == self.tokenizer.encode(END_TOKEN, add_special_tokens=False)[0]).any():
                 break
         
         return tokens
