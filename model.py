@@ -16,6 +16,7 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import transformers
 from typing import Optional, Tuple
 from constants import (
@@ -23,6 +24,111 @@ from constants import (
     NUM_HEADS, FEEDFORWARD_DIM, NUM_DECODER_LAYERS, CLIP_MODEL_NAME, START_TOKEN, END_TOKEN
 )
 import os
+
+class DecoderLayer(nn.Module):
+    """A single decoder layer with masked self-attention and feedforward network.
+    
+    This layer implements the standard transformer decoder layer without cross-attention.
+    It consists of:
+    1. Masked multi-head self-attention
+    2. Layer normalization
+    3. Position-wise feedforward network
+    4. Layer normalization
+    """
+    
+    def __init__(
+        self,
+        d_model: int,
+        nhead: int,
+        dim_feedforward: int = 2048,
+        dropout: float = 0.1,
+        activation: str = "relu",
+        layer_norm_eps: float = 1e-5,
+        batch_first: bool = True,
+    ):
+        super().__init__()
+        self.self_attn = nn.MultiheadAttention(
+            d_model, nhead, dropout=dropout, batch_first=batch_first
+        )
+        self.linear1 = nn.Linear(d_model, dim_feedforward)
+        self.dropout = nn.Dropout(dropout)
+        self.linear2 = nn.Linear(dim_feedforward, d_model)
+        
+        self.norm1 = nn.LayerNorm(d_model, eps=layer_norm_eps)
+        self.norm2 = nn.LayerNorm(d_model, eps=layer_norm_eps)
+        self.dropout1 = nn.Dropout(dropout)
+        self.dropout2 = nn.Dropout(dropout)
+        
+        self.activation = F.relu if activation == "relu" else F.gelu
+        
+    def forward(
+        self,
+        tgt: torch.Tensor,
+        tgt_mask: Optional[torch.Tensor] = None,
+        tgt_key_padding_mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """Forward pass of the decoder layer.
+        
+        Args:
+            tgt: Target sequence of shape (batch_size, seq_len, d_model)
+            tgt_mask: Optional mask for self-attention of shape (seq_len, seq_len)
+            tgt_key_padding_mask: Optional key padding mask of shape (batch_size, seq_len)
+            
+        Returns:
+            Output tensor of shape (batch_size, seq_len, d_model)
+        """
+        # Self-attention block
+        tgt2 = self.norm1(tgt)
+        tgt2 = self.self_attn(
+            tgt2, tgt2, tgt2,
+            attn_mask=tgt_mask,
+            key_padding_mask=tgt_key_padding_mask
+        )[0]
+        tgt = tgt + self.dropout1(tgt2)
+        
+        # Feedforward block
+        tgt2 = self.norm2(tgt)
+        tgt2 = self.linear2(self.dropout(self.activation(self.linear1(tgt2))))
+        tgt = tgt + self.dropout2(tgt2)
+        
+        return tgt
+
+
+class Decoder(nn.Module):
+    """Stack of decoder layers."""
+    
+    def __init__(
+        self,
+        decoder_layer: DecoderLayer,
+        num_layers: int,
+    ):
+        super().__init__()
+        self.layers = nn.ModuleList([decoder_layer for _ in range(num_layers)])
+        
+    def forward(
+        self,
+        tgt: torch.Tensor,
+        tgt_mask: Optional[torch.Tensor] = None,
+        tgt_key_padding_mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """Forward pass through all decoder layers.
+        
+        Args:
+            tgt: Target sequence of shape (batch_size, seq_len, d_model)
+            tgt_mask: Optional mask for self-attention of shape (seq_len, seq_len)
+            tgt_key_padding_mask: Optional key padding mask of shape (batch_size, seq_len)
+            
+        Returns:
+            Output tensor of shape (batch_size, seq_len, d_model)
+        """
+        output = tgt
+        for layer in self.layers:
+            output = layer(
+                output,
+                tgt_mask=tgt_mask,
+                tgt_key_padding_mask=tgt_key_padding_mask,
+            )
+        return output
 
 class ImageCaptionModel(nn.Module):
     def __init__(self, clip_model_name: str = CLIP_MODEL_NAME):
@@ -38,8 +144,8 @@ class ImageCaptionModel(nn.Module):
         self.text_encoder = self.clip_model.text_model
         self.text_embeddings = self.text_encoder.embeddings
         
-        self.decoder = nn.TransformerDecoder(
-            decoder_layer=nn.TransformerDecoderLayer(
+        self.decoder = Decoder(
+            decoder_layer=DecoderLayer(
                 d_model=EMBEDDING_SIZE,
                 nhead=NUM_HEADS,
                 dim_feedforward=FEEDFORWARD_DIM,
@@ -131,7 +237,6 @@ class ImageCaptionModel(nn.Module):
         # Process sequence through decoder
         decoder_output = self.decoder(
             tgt=decoder_input,      # (batch_size, seq_len, embedding_size)
-            memory=None,            # No memory mechanism
             tgt_mask=tgt_mask      # (seq_len, seq_len)
         )
         

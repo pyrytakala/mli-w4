@@ -8,7 +8,7 @@ from data import get_train_val_dataloaders
 from torch.utils.data import DataLoader
 from constants import (
     DEFAULT_BATCH_SIZE, DEFAULT_LEARNING_RATE, DEFAULT_NUM_EPOCHS,
-    MAX_CAPTION_LENGTH
+    MAX_SEQUENCE_LENGTH
 )
 
 def log_val_examples(
@@ -30,12 +30,12 @@ def log_val_examples(
     model.eval()
     
     # Get a batch of validation examples
-    images, captions = next(iter(val_loader))
+    images, input_ids, attention_mask = next(iter(val_loader))
     images = images.to(device)
     
     # Generate captions
     with torch.no_grad():
-        generated_ids = model.generate(images, max_length=MAX_CAPTION_LENGTH, temperature=1.0)
+        generated_ids = model.generate(images, max_length=MAX_SEQUENCE_LENGTH, temperature=1.0)
     
     # Decode generated captions
     generated_captions = [
@@ -43,8 +43,14 @@ def log_val_examples(
         for ids in generated_ids
     ]
     
+    # Decode ground truth captions
+    ground_truth_captions = [
+        model.tokenizer.decode(ids, skip_special_tokens=True)
+        for ids in input_ids
+    ]
+    
     # Log to wandb
-    for i, (img, gt, pred) in enumerate(zip(images, captions, generated_captions)):
+    for i, (img, gt, pred) in enumerate(zip(images, ground_truth_captions, generated_captions)):
         if i >= num_examples:
             break
         wandb.log({
@@ -64,43 +70,25 @@ def validate_epoch(
     device: torch.device,
     max_batches: int = 20  # Limit validation to 20 batches
 ) -> float:
-    """Evaluate on validation set.
-    
-    Args:
-        model: Model to evaluate
-        dataloader: Validation dataloader
-        criterion: Loss criterion
-        device: Device to run on
-        max_batches: Maximum number of batches to validate on
-    """
+    """Evaluate on validation set."""
     model.eval()
     total_loss = 0
     total_tokens = 0
     
     with torch.no_grad():
-        for batch_idx, (images, captions) in enumerate(tqdm(dataloader, desc="Validating")):
+        for batch_idx, (images, input_ids, attention_mask) in enumerate(tqdm(dataloader, desc="Validating")):
             if batch_idx >= max_batches:
                 break
                 
             # Move data to device
             images = images.to(device)
-            
-            # Tokenize captions
-            tokenized = model.tokenizer(
-                captions,
-                padding=True,
-                return_tensors="pt",
-                truncation=True,
-                max_length=MAX_CAPTION_LENGTH
-            )
-            input_ids = tokenized.input_ids.to(device)
+            input_ids = input_ids.to(device)
+            attention_mask = attention_mask.to(device)
             
             # Create target tokens (shifted by one)
             target_ids = input_ids[:, 1:]
             input_ids = input_ids[:, :-1]
-            
-            # Create attention mask
-            attention_mask = tokenized.attention_mask[:, :-1].to(device)
+            attention_mask = attention_mask[:, :-1]
             
             # Forward pass
             logits = model(images, input_ids, tgt_mask=None)
@@ -137,33 +125,22 @@ def train_epoch(
     total_loss = 0
     total_tokens = 0
     
-    for batch_idx, (images, captions) in enumerate(tqdm(dataloader, desc="Training")):
+    for batch_idx, (images, input_ids, attention_mask) in enumerate(tqdm(dataloader, desc="Training")):
         # Move data to device
         images = images.to(device)
-        
-        # Tokenize captions (captions is a list of strings)
-        tokenized = model.tokenizer(
-            captions,
-            padding=True,
-            return_tensors="pt",
-            truncation=True,
-            max_length=MAX_CAPTION_LENGTH
-        )
-        input_ids = tokenized.input_ids.to(device)
+        input_ids = input_ids.to(device)
+        attention_mask = attention_mask.to(device)
         
         # Create target tokens (shifted by one)
         target_ids = input_ids[:, 1:]
         input_ids = input_ids[:, :-1]
-        
-        # Create attention mask
-        attention_mask = tokenized.attention_mask[:, :-1].to(device)
+        attention_mask = attention_mask[:, :-1]
         
         # Forward pass
         optimizer.zero_grad()
         logits = model(images, input_ids, tgt_mask=None)
         
         # Calculate loss
-        # Reshape tensors to be contiguous before loss calculation
         batch_size, seq_len, vocab_size = logits.shape
         
         # Ensure shapes match before reshaping
@@ -221,7 +198,7 @@ def main():
             "batch_size": DEFAULT_BATCH_SIZE,
             "learning_rate": DEFAULT_LEARNING_RATE,
             "num_epochs": DEFAULT_NUM_EPOCHS,
-            "max_caption_length": MAX_CAPTION_LENGTH
+            "max_sequence_length": MAX_SEQUENCE_LENGTH
         }
     )
     
@@ -236,7 +213,11 @@ def main():
     wandb.watch(model)
     
     # Get train and validation dataloaders
-    train_loader, val_loader = get_train_val_dataloaders(batch_size=DEFAULT_BATCH_SIZE)
+    train_loader, val_loader = get_train_val_dataloaders(
+        batch_size=DEFAULT_BATCH_SIZE,
+        tokenizer=model.tokenizer,
+        max_length=MAX_SEQUENCE_LENGTH
+    )
     
     # Create optimizer and criterion
     optimizer = optim.AdamW(model.parameters(), lr=DEFAULT_LEARNING_RATE)

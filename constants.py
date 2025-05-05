@@ -16,7 +16,7 @@ DEFAULT_BATCH_SIZE = 8
 DEFAULT_TRAIN_SPLIT = 0.8
 DEFAULT_LEARNING_RATE = 1e-4
 DEFAULT_NUM_EPOCHS = 10
-MAX_CAPTION_LENGTH = 50
+MAX_SEQUENCE_LENGTH = 77  # Total sequence length including image patches and caption tokens
 
 # CLIP model name
 CLIP_MODEL_NAME = 'openai/clip-vit-base-patch32' 
