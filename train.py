@@ -11,19 +11,77 @@ from constants import (
     MAX_CAPTION_LENGTH
 )
 
+def log_val_examples(
+    model: ImageCaptionModel,
+    val_loader: DataLoader,
+    device: torch.device,
+    step: int,
+    num_examples: int = 4
+) -> None:
+    """Log validation examples to wandb.
+    
+    Args:
+        model: The model to use for generation
+        val_loader: Validation dataloader
+        device: Device to run inference on
+        step: Current training step
+        num_examples: Number of examples to log
+    """
+    model.eval()
+    
+    # Get a batch of validation examples
+    images, captions = next(iter(val_loader))
+    images = images.to(device)
+    
+    # Generate captions
+    with torch.no_grad():
+        generated_ids = model.generate(images, max_length=MAX_CAPTION_LENGTH, temperature=1.0)
+    
+    # Decode generated captions
+    generated_captions = [
+        model.tokenizer.decode(ids, skip_special_tokens=True)
+        for ids in generated_ids
+    ]
+    
+    # Log to wandb
+    for i, (img, gt, pred) in enumerate(zip(images, captions, generated_captions)):
+        if i >= num_examples:
+            break
+        wandb.log({
+            "val_examples": {
+                f"example_{i}": wandb.Image(
+                    img.cpu(),
+                    caption=f"Ground Truth: {gt}\nGenerated: {pred}"
+                )
+            },
+            "step": step
+        })
+
 def validate_epoch(
     model: ImageCaptionModel,
     dataloader: DataLoader,
     criterion: nn.Module,
-    device: torch.device
+    device: torch.device,
+    max_batches: int = 20  # Limit validation to 20 batches
 ) -> float:
-    """Evaluate on validation set."""
+    """Evaluate on validation set.
+    
+    Args:
+        model: Model to evaluate
+        dataloader: Validation dataloader
+        criterion: Loss criterion
+        device: Device to run on
+        max_batches: Maximum number of batches to validate on
+    """
     model.eval()
     total_loss = 0
     total_tokens = 0
     
     with torch.no_grad():
-        for images, captions in tqdm(dataloader, desc="Validating"):
+        for batch_idx, (images, captions) in enumerate(tqdm(dataloader, desc="Validating")):
+            if batch_idx >= max_batches:
+                break
+                
             # Move data to device
             images = images.to(device)
             
@@ -72,7 +130,7 @@ def train_epoch(
     criterion: nn.Module,
     device: torch.device,
     val_loader: DataLoader = None,
-    val_every: int = 100
+    val_every: int = 500  # Validate every 500 batches instead of 100
 ) -> float:
     """Train for one epoch."""
     model.train()
@@ -107,7 +165,6 @@ def train_epoch(
         # Calculate loss
         # Reshape tensors to be contiguous before loss calculation
         batch_size, seq_len, vocab_size = logits.shape
-        print(f"Batch size: {batch_size}, Seq len: {seq_len}, Vocab size: {vocab_size}")
         
         # Ensure shapes match before reshaping
         assert target_ids.shape[0] == batch_size, f"Target batch size {target_ids.shape[0]} != logits batch size {batch_size}"
@@ -142,7 +199,7 @@ def train_epoch(
             "learning_rate": optimizer.param_groups[0]['lr']
         })
         
-        # Compute validation loss every val_every batches
+        # Compute validation loss and examples every val_every batches
         if val_loader is not None and (batch_idx + 1) % val_every == 0:
             val_loss = validate_epoch(model, val_loader, criterion, device)
             print(f"Validation Loss (batch {batch_idx + 1}): {val_loss:.4f}")
@@ -150,6 +207,9 @@ def train_epoch(
                 "val_loss": val_loss,
                 "val_step": batch_idx + 1
             })
+            
+            # Log validation examples
+            log_val_examples(model, val_loader, device, step=batch_idx + 1)
     
     return total_loss / total_tokens
 
@@ -189,7 +249,7 @@ def main():
         # Train
         train_loss = train_epoch(
             model, train_loader, optimizer, criterion, device,
-            val_loader=val_loader, val_every=100
+            val_loader=val_loader, val_every=500
         )
         print(f"Train Loss: {train_loss:.4f}")
         
@@ -198,6 +258,9 @@ def main():
             "epoch": epoch + 1,
             "train_loss": train_loss
         })
+        
+        # Log validation examples at the end of each epoch
+        log_val_examples(model, val_loader, device, step=(epoch + 1) * len(train_loader))
     
     # Finish wandb run
     wandb.finish()

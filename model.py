@@ -67,12 +67,10 @@ class ImageCaptionModel(nn.Module):
         with torch.no_grad():
             # CLIP vision model outputs (batch_size, seq_len, hidden_size)
             vision_output = self.image_encoder(images)
-            print(f"Vision model output shape: {vision_output.last_hidden_state.shape}")
             image_features = vision_output.last_hidden_state
 
         # Project to (batch_size, seq_len, embedding_size)
         projected_features = self.image_projection(image_features)
-        print(f"Projected features shape: {projected_features.shape}")
         return projected_features
 
     def encode_text(self, text_tokens: torch.Tensor) -> torch.Tensor:
