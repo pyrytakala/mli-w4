@@ -38,7 +38,6 @@ class ImageCaptionModel(nn.Module):
         self.text_encoder = self.clip_model.text_model
         self.text_embeddings = self.text_encoder.embeddings
         
-        # Decoder
         self.decoder = nn.TransformerDecoder(
             decoder_layer=nn.TransformerDecoderLayer(
                 d_model=EMBEDDING_SIZE,
@@ -53,7 +52,6 @@ class ImageCaptionModel(nn.Module):
         vocab_size = self.text_embeddings.token_embedding.weight.shape[0]
         self.output_layer = nn.Linear(EMBEDDING_SIZE, vocab_size)
         
-        # Tokenizer
         self.tokenizer = transformers.CLIPTokenizer.from_pretrained(clip_model_name)
         
     def encode_image(self, images: torch.Tensor) -> torch.Tensor:
@@ -66,8 +64,6 @@ class ImageCaptionModel(nn.Module):
         Returns:
             Image features of shape (batch_size, seq_len, embedding_size)
         """
-        # Debug input shape
-        print(f"Input images shape: {images.shape}")
         
         with torch.no_grad():
             # CLIP vision model outputs (batch_size, seq_len, hidden_size)
@@ -139,11 +135,7 @@ class ImageCaptionModel(nn.Module):
         if tgt_mask is None:
             seq_len = decoder_input.size(1)
             tgt_mask = nn.Transformer.generate_square_subsequent_mask(seq_len).to(decoder_input.device)
-        
-        # Debug shapes
-        print(f"decoder_input shape: {decoder_input.shape}")
-        print(f"image_features shape: {image_features.shape}")
-        print(f"tgt_mask shape: {tgt_mask.shape}")
+
         
         # Ensure no empty tensors
         if decoder_input.numel() == 0 or image_features.numel() == 0:

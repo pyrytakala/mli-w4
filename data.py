@@ -30,7 +30,6 @@ class FlickrDataset(Dataset):
         caption = random.choice(captions)
         return image, caption
 
-
 def get_flickr_dataloader(batch_size=DEFAULT_BATCH_SIZE):
     preprocess = transforms.Compose([
         transforms.Resize(IMAGE_SIZE, interpolation=transforms.InterpolationMode.BICUBIC),
@@ -41,31 +40,17 @@ def get_flickr_dataloader(batch_size=DEFAULT_BATCH_SIZE):
     dataset = FlickrDataset(split="test", transform=preprocess)
     return DataLoader(dataset, batch_size=batch_size, shuffle=False, collate_fn=flickr_collate_fn)
 
-
 def get_train_val_dataloaders(batch_size=DEFAULT_BATCH_SIZE, train_split=DEFAULT_TRAIN_SPLIT):
-    """Get train and validation dataloaders for the Flickr dataset.
-    
-    Args:
-        batch_size (int): Batch size for the dataloaders
-        train_split (float): Proportion of data to use for training
-        
-    Returns:
-        tuple: (train_loader, val_loader)
-    """
-    # Get the full dataset
     full_dataset = get_flickr_dataloader(batch_size=1).dataset
     
-    # Split into train and validation sets
     train_size = int(train_split * len(full_dataset))
     val_size = len(full_dataset) - train_size
     train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
     
-    # Create dataloaders using the custom collate function
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=flickr_collate_fn)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn=flickr_collate_fn)
     
     return train_loader, val_loader
-
 
 def main():
     dataloader = get_flickr_dataloader(batch_size=1)

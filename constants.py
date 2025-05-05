@@ -1,5 +1,3 @@
-"""Constants shared across the codebase."""
-
 # Image processing constants
 IMAGE_CHANNELS = 3
 IMAGE_SIZE = 224
