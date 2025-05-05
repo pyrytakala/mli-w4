@@ -8,7 +8,7 @@ from data import get_train_val_dataloaders
 from torch.utils.data import DataLoader
 from constants import (
     DEFAULT_BATCH_SIZE, DEFAULT_LEARNING_RATE, DEFAULT_NUM_EPOCHS,
-    MAX_SEQUENCE_LENGTH
+    MAX_SEQUENCE_LENGTH, VALIDATION_FREQUENCY
 )
 
 def log_val_examples(
@@ -122,7 +122,7 @@ def train_epoch(
     criterion: nn.Module,
     device: torch.device,
     val_loader: DataLoader = None,
-    val_every: int = 500  # Validate every 500 batches instead of 100
+    val_every: int = VALIDATION_FREQUENCY  # Use the constant from constants.py
 ) -> float:
     """Train for one epoch."""
     model.train()
@@ -232,7 +232,7 @@ def main():
         # Train
         train_loss = train_epoch(
             model, train_loader, optimizer, criterion, device,
-            val_loader=val_loader, val_every=500
+            val_loader=val_loader, val_every=VALIDATION_FREQUENCY
         )
         print(f"Train Loss: {train_loss:.4f}")
         

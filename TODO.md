@@ -1,8 +1,4 @@
-paddings
-
-everything decoder, no memory
-
-
+why 81, not 77?
 
 
 add endpoint so can test w camera

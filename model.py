@@ -264,14 +264,20 @@ class ImageCaptionModel(nn.Module):
         batch_size = images.shape[0]
         device = images.device
         
-        
         # Initialize with start token: (batch_size, 1)
         start_token = self.tokenizer.encode(START_TOKEN, add_special_tokens=False)[0]
         tokens = torch.full((batch_size, 1), start_token, dtype=torch.long, device=device)
         
+        # Get image features to determine sequence length
+        with torch.no_grad():
+            image_features = self.encode_image(images)
+            num_image_patches = image_features.shape[1]
+        
         for _ in range(max_length):
-            # Create causal mask: (current_seq_len, current_seq_len)
-            tgt_mask = nn.Transformer.generate_square_subsequent_mask(tokens.shape[1]).to(device)
+            # Create causal mask for the full sequence (image patches + text tokens)
+            current_seq_len = tokens.shape[1]
+            total_seq_len = num_image_patches + current_seq_len
+            tgt_mask = nn.Transformer.generate_square_subsequent_mask(total_seq_len).to(device)
             
             # Get next token logits: (batch_size, 1, vocab_size)
             logits = self.forward(images, tokens, tgt_mask)
