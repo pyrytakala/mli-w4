@@ -116,7 +116,8 @@ class ImageCaptionModel(nn.Module):
             # Ensure batch sizes match
             assert text_features.size(0) == image_features.size(0), f"Text features batch size {text_features.size(0)} != image features batch size {image_features.size(0)}"
             
-            decoder_input = text_features
+            # Concatenate image and text features along sequence dimension
+            decoder_input = torch.cat([image_features, text_features], dim=1)
         
         # Create causal mask if not provided: (seq_len, seq_len)
         if tgt_mask is None:
@@ -124,12 +125,13 @@ class ImageCaptionModel(nn.Module):
             tgt_mask = nn.Transformer.generate_square_subsequent_mask(seq_len).to(decoder_input.device)
 
         # Ensure no empty tensors
-        if decoder_input.numel() == 0 or image_features.numel() == 0:
-            raise ValueError("Empty tensors detected in decoder input or image features")
+        if decoder_input.numel() == 0:
+            raise ValueError("Empty tensors detected in decoder input")
         
+        # Process sequence through decoder
         decoder_output = self.decoder(
             tgt=decoder_input,      # (batch_size, seq_len, embedding_size)
-            memory=image_features,  # (batch_size, seq_len, embedding_size)
+            memory=None,            # No memory mechanism
             tgt_mask=tgt_mask      # (seq_len, seq_len)
         )
         
