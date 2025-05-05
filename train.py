@@ -47,14 +47,7 @@ def train_epoch(
         # Forward pass
         optimizer.zero_grad()
         logits = model(images, input_ids, tgt_mask=None)
-        
-        # Debug shapes before reshaping
-        print(f"\nBatch {batch_idx} shapes:")
-        print(f"Images: {images.shape}")
-        print(f"Input IDs: {input_ids.shape}")
-        print(f"Target IDs: {target_ids.shape}")
-        print(f"Attention mask: {attention_mask.shape}")
-        print(f"Logits: {logits.shape}")
+
         
         # Calculate loss
         # Reshape tensors to be contiguous before loss calculation
@@ -71,12 +64,6 @@ def train_epoch(
         logits_reshaped = logits.reshape(-1, vocab_size)  # [batch_size * seq_len, vocab_size]
         target_reshaped = target_ids.reshape(-1)          # [batch_size * seq_len]
         mask_reshaped = attention_mask.reshape(-1)        # [batch_size * seq_len]
-        
-        # Debug shapes after reshaping
-        print(f"After reshaping:")
-        print(f"Logits reshaped: {logits_reshaped.shape}")
-        print(f"Target reshaped: {target_reshaped.shape}")
-        print(f"Mask reshaped: {mask_reshaped.shape}")
         
         # Apply mask to loss calculation
         loss = criterion(logits_reshaped, target_reshaped)
