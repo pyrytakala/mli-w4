@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
+import wandb
 from model import ImageCaptionModel
 from data import get_train_val_dataloaders
 from torch.utils.data import DataLoader
@@ -90,17 +91,38 @@ def train_epoch(
         total_tokens += mask_reshaped.sum().item()
         
         # Print loss for this batch
-        print(f"Batch loss: {masked_loss.mean().item():.4f}")
+        batch_loss = masked_loss.mean().item()
+        print(f"Batch loss: {batch_loss:.4f}")
+        
+        # Log batch metrics to wandb
+        wandb.log({
+            "batch_loss": batch_loss,
+            "learning_rate": optimizer.param_groups[0]['lr']
+        })
     
     return total_loss / total_tokens
 
 def main():
+    # Initialize wandb
+    wandb.init(
+        project="image-captioning",
+        config={
+            "batch_size": DEFAULT_BATCH_SIZE,
+            "learning_rate": DEFAULT_LEARNING_RATE,
+            "num_epochs": DEFAULT_NUM_EPOCHS,
+            "max_caption_length": MAX_CAPTION_LENGTH
+        }
+    )
+    
     # Set device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     
     # Create model
     model = ImageCaptionModel().to(device)
+    
+    # Log model architecture
+    wandb.watch(model)
     
     # Get train and validation dataloaders
     train_loader, _ = get_train_val_dataloaders(batch_size=DEFAULT_BATCH_SIZE)
@@ -118,6 +140,15 @@ def main():
             model, train_loader, optimizer, criterion, device
         )
         print(f"Train Loss: {train_loss:.4f}")
+        
+        # Log epoch metrics
+        wandb.log({
+            "epoch": epoch + 1,
+            "train_loss": train_loss
+        })
+    
+    # Finish wandb run
+    wandb.finish()
 
 if __name__ == "__main__":
     main() 
