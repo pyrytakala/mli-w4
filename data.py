@@ -3,6 +3,7 @@ from torch.utils.data import DataLoader, Dataset, random_split
 from torchvision import transforms
 import torch
 import random
+from constants import IMAGE_SIZE, IMAGE_MEAN, IMAGE_STD, DEFAULT_BATCH_SIZE, DEFAULT_TRAIN_SPLIT
 
 def flickr_collate_fn(batch):
     # Stack image tensors into a single batch tensor: (batch_size, 3, 224, 224)
@@ -30,18 +31,18 @@ class FlickrDataset(Dataset):
         return image, caption
 
 
-def get_flickr_dataloader(batch_size=1):
+def get_flickr_dataloader(batch_size=DEFAULT_BATCH_SIZE):
     preprocess = transforms.Compose([
-        transforms.Resize(224, interpolation=transforms.InterpolationMode.BICUBIC),
-        transforms.CenterCrop(224),
+        transforms.Resize(IMAGE_SIZE, interpolation=transforms.InterpolationMode.BICUBIC),
+        transforms.CenterCrop(IMAGE_SIZE),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711]),
+        transforms.Normalize(mean=IMAGE_MEAN, std=IMAGE_STD),
     ])
     dataset = FlickrDataset(split="test", transform=preprocess)
     return DataLoader(dataset, batch_size=batch_size, shuffle=False, collate_fn=flickr_collate_fn)
 
 
-def get_train_val_dataloaders(batch_size=8, train_split=0.8):
+def get_train_val_dataloaders(batch_size=DEFAULT_BATCH_SIZE, train_split=DEFAULT_TRAIN_SPLIT):
     """Get train and validation dataloaders for the Flickr dataset.
     
     Args:
