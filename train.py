@@ -93,11 +93,15 @@ def validate_epoch(
             # Forward pass
             logits = model(images, input_ids, tgt_mask=None)
             
+            # Slice logits to only use caption part
+            num_image_patches = logits.shape[1] - input_ids.shape[1]
+            caption_logits = logits[:, num_image_patches:, :]
+            
             # Calculate loss
-            batch_size, seq_len, vocab_size = logits.shape
+            batch_size, seq_len, vocab_size = caption_logits.shape
             
             # Reshape tensors
-            logits_reshaped = logits.reshape(-1, vocab_size)
+            logits_reshaped = caption_logits.reshape(-1, vocab_size)
             target_reshaped = target_ids.reshape(-1)
             mask_reshaped = attention_mask.reshape(-1)
             
@@ -140,19 +144,17 @@ def train_epoch(
         optimizer.zero_grad()
         logits = model(images, input_ids, tgt_mask=None)
         
-        # Calculate loss
-        batch_size, seq_len, vocab_size = logits.shape
+        # Slice logits to only use caption part
+        num_image_patches = logits.shape[1] - input_ids.shape[1]
+        caption_logits = logits[:, num_image_patches:, :]
         
-        # Ensure shapes match before reshaping
-        assert target_ids.shape[0] == batch_size, f"Target batch size {target_ids.shape[0]} != logits batch size {batch_size}"
-        assert target_ids.shape[1] == seq_len, f"Target seq len {target_ids.shape[1]} != logits seq len {seq_len}"
-        assert attention_mask.shape[0] == batch_size, f"Mask batch size {attention_mask.shape[0]} != logits batch size {batch_size}"
-        assert attention_mask.shape[1] == seq_len, f"Mask seq len {attention_mask.shape[1]} != logits seq len {seq_len}"
+        # Calculate loss
+        batch_size, seq_len, vocab_size = caption_logits.shape
         
         # Reshape tensors
-        logits_reshaped = logits.reshape(-1, vocab_size)  # [batch_size * seq_len, vocab_size]
-        target_reshaped = target_ids.reshape(-1)          # [batch_size * seq_len]
-        mask_reshaped = attention_mask.reshape(-1)        # [batch_size * seq_len]
+        logits_reshaped = caption_logits.reshape(-1, vocab_size)
+        target_reshaped = target_ids.reshape(-1)
+        mask_reshaped = attention_mask.reshape(-1)
         
         # Apply mask to loss calculation
         loss = criterion(logits_reshaped, target_reshaped)
