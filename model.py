@@ -22,6 +22,7 @@ from constants import (
     IMAGE_CHANNELS, IMAGE_SIZE, CLIP_HIDDEN_SIZE, EMBEDDING_SIZE,
     NUM_HEADS, FEEDFORWARD_DIM, NUM_DECODER_LAYERS, CLIP_MODEL_NAME, START_TOKEN, END_TOKEN
 )
+import os
 
 class ImageCaptionModel(nn.Module):
     def __init__(self, clip_model_name: str = CLIP_MODEL_NAME):
@@ -181,5 +182,25 @@ class ImageCaptionModel(nn.Module):
                 break
         
         return tokens
+
+def save_checkpoint(model, optimizer, epoch, batch_idx, path="checkpoint.pth"):
+    checkpoint = {
+        "model_state_dict": model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "epoch": epoch,
+        "batch_idx": batch_idx,
+    }
+    torch.save(checkpoint, path)
+    print(f"Checkpoint saved at {path}")
+
+def load_checkpoint(model, optimizer, path="checkpoint.pth"):
+    if not os.path.exists(path):
+        print("No checkpoint found at", path)
+        return 0, 0  # start from scratch
+    checkpoint = torch.load(path, map_location="cpu")
+    model.load_state_dict(checkpoint["model_state_dict"])
+    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+    print(f"Loaded checkpoint from {path}")
+    return checkpoint["epoch"], checkpoint["batch_idx"]
 
 
