@@ -11,12 +11,68 @@ from constants import (
     MAX_CAPTION_LENGTH
 )
 
+def validate_epoch(
+    model: ImageCaptionModel,
+    dataloader: DataLoader,
+    criterion: nn.Module,
+    device: torch.device
+) -> float:
+    """Evaluate on validation set."""
+    model.eval()
+    total_loss = 0
+    total_tokens = 0
+    
+    with torch.no_grad():
+        for images, captions in tqdm(dataloader, desc="Validating"):
+            # Move data to device
+            images = images.to(device)
+            
+            # Tokenize captions
+            tokenized = model.tokenizer(
+                captions,
+                padding=True,
+                return_tensors="pt",
+                truncation=True,
+                max_length=MAX_CAPTION_LENGTH
+            )
+            input_ids = tokenized.input_ids.to(device)
+            
+            # Create target tokens (shifted by one)
+            target_ids = input_ids[:, 1:]
+            input_ids = input_ids[:, :-1]
+            
+            # Create attention mask
+            attention_mask = tokenized.attention_mask[:, :-1].to(device)
+            
+            # Forward pass
+            logits = model(images, input_ids, tgt_mask=None)
+            
+            # Calculate loss
+            batch_size, seq_len, vocab_size = logits.shape
+            
+            # Reshape tensors
+            logits_reshaped = logits.reshape(-1, vocab_size)
+            target_reshaped = target_ids.reshape(-1)
+            mask_reshaped = attention_mask.reshape(-1)
+            
+            # Apply mask to loss calculation
+            loss = criterion(logits_reshaped, target_reshaped)
+            masked_loss = loss * mask_reshaped
+            
+            # Update metrics
+            total_loss += masked_loss.sum().item()
+            total_tokens += mask_reshaped.sum().item()
+    
+    return total_loss / total_tokens if total_tokens > 0 else 0.0
+
 def train_epoch(
     model: ImageCaptionModel,
     dataloader: DataLoader,
     optimizer: optim.Optimizer,
     criterion: nn.Module,
-    device: torch.device
+    device: torch.device,
+    val_loader: DataLoader = None,
+    val_every: int = 100
 ) -> float:
     """Train for one epoch."""
     model.train()
@@ -47,7 +103,6 @@ def train_epoch(
         # Forward pass
         optimizer.zero_grad()
         logits = model(images, input_ids, tgt_mask=None)
-
         
         # Calculate loss
         # Reshape tensors to be contiguous before loss calculation
@@ -86,6 +141,15 @@ def train_epoch(
             "batch_loss": batch_loss,
             "learning_rate": optimizer.param_groups[0]['lr']
         })
+        
+        # Compute validation loss every val_every batches
+        if val_loader is not None and (batch_idx + 1) % val_every == 0:
+            val_loss = validate_epoch(model, val_loader, criterion, device)
+            print(f"Validation Loss (batch {batch_idx + 1}): {val_loss:.4f}")
+            wandb.log({
+                "val_loss": val_loss,
+                "val_step": batch_idx + 1
+            })
     
     return total_loss / total_tokens
 
@@ -112,7 +176,7 @@ def main():
     wandb.watch(model)
     
     # Get train and validation dataloaders
-    train_loader, _ = get_train_val_dataloaders(batch_size=DEFAULT_BATCH_SIZE)
+    train_loader, val_loader = get_train_val_dataloaders(batch_size=DEFAULT_BATCH_SIZE)
     
     # Create optimizer and criterion
     optimizer = optim.AdamW(model.parameters(), lr=DEFAULT_LEARNING_RATE)
@@ -124,7 +188,8 @@ def main():
         
         # Train
         train_loss = train_epoch(
-            model, train_loader, optimizer, criterion, device
+            model, train_loader, optimizer, criterion, device,
+            val_loader=val_loader, val_every=100
         )
         print(f"Train Loss: {train_loss:.4f}")
         
