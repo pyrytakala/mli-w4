@@ -16,7 +16,7 @@ DEFAULT_BATCH_SIZE = 8
 DEFAULT_TRAIN_SPLIT = 0.8
 DEFAULT_LEARNING_RATE = 1e-4
 DEFAULT_NUM_EPOCHS = 10
-MAX_SEQUENCE_LENGTH = 77 + 2  # Total sequence length including image patches and caption tokens (+1 for END_TOKEN and START_TOKEN)
+MAX_SEQUENCE_LENGTH = 77  # Total sequence length including image patches and caption tokens
 VALIDATION_FREQUENCY = 100  # Validate and log examples every 100 minibatches
 
 # CLIP model name

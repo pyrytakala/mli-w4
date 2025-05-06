@@ -29,7 +29,6 @@ def flickr_collate_fn(batch, tokenizer, max_length: int = MAX_SEQUENCE_LENGTH):
     # Collect captions into a list of strings
     captions = [item[1] for item in batch]
     
-    # Prepend START_TOKEN and append END_TOKEN to each caption
     captions = [START_TOKEN + " " + caption + " " + END_TOKEN for caption in captions]
     
     # Tokenize and pad captions

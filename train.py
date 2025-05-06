@@ -49,19 +49,35 @@ def log_val_examples(
         for ids in input_ids
     ]
     
-    # Log to wandb
+    # Create HTML table for side-by-side display
+    html_content = "<table style='width:100%'>"
     for i, (img, gt, pred) in enumerate(zip(images, ground_truth_captions, generated_captions)):
         if i >= num_examples:
             break
-        wandb.log({
-            "val_examples": {
-                f"example_{i}": wandb.Image(
-                    img.cpu(),
-                    caption=f"Ground Truth: {gt}\nGenerated: {pred}"
-                )
-            },
-            "step": step
-        })
+        # Convert image to wandb image
+        wandb_img = wandb.Image(img.cpu())
+        # Get the image URL from wandb image
+        img_url = wandb_img.image_url
+        
+        # Create table row with image and captions side by side
+        html_content += f"""
+        <tr>
+            <td style='width:50%'>
+                <img src='{img_url}' style='max-width:100%'/>
+            </td>
+            <td style='width:50%; padding-left:20px; vertical-align:top'>
+                <p><strong>Generated:</strong><br>{pred}</p>
+                <p><strong>Ground Truth:</strong><br>{gt}</p>
+            </td>
+        </tr>
+        """
+    html_content += "</table>"
+    
+    # Log to wandb
+    wandb.log({
+        "val_examples": wandb.Html(html_content),
+        "step": step
+    })
 
 def validate_epoch(
     model: ImageCaptionModel,
