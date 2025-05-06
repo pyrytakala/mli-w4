@@ -281,6 +281,11 @@ def main():
         
         # Log validation examples at the end of each epoch
         log_val_examples(model, val_loader, device, step=(epoch + 1) * len(train_loader))
+
+        # Save the model at the end of each epoch
+        model_path = f"model_epoch_{epoch+1}.pth"
+        torch.save(model.state_dict(), model_path)
+        wandb.save(model_path)
     
     # Finish wandb run
     wandb.finish()
