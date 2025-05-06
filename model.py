@@ -293,7 +293,15 @@ class ImageCaptionModel(nn.Module):
             image_features = self.encode_image(images)
             num_image_patches = image_features.shape[1]
         
+        # Track which sequences are still generating
+        end_token_id = self.tokenizer.encode(END_TOKEN, add_special_tokens=False)[0]
+        still_generating = torch.ones(batch_size, dtype=torch.bool, device=device)
+        
         for _ in range(max_length):
+            # If all sequences are done, break
+            if not still_generating.any():
+                break
+            
             # Create causal mask for the full sequence (image patches + text tokens)
             current_seq_len = tokens.shape[1]
             total_seq_len = num_image_patches + current_seq_len
@@ -307,12 +315,18 @@ class ImageCaptionModel(nn.Module):
             probs = torch.softmax(next_token_logits, dim=-1)
             next_token = torch.multinomial(probs, num_samples=1)
             
+            # Update which sequences are still generating
+            still_generating = still_generating & (next_token.squeeze(-1) != end_token_id)
+            
+            # For sequences that are done, replace their next token with padding
+            next_token = torch.where(
+                still_generating.unsqueeze(-1),
+                next_token,
+                torch.full_like(next_token, self.tokenizer.pad_token_id)
+            )
+            
             # Append to tokens: (batch_size, current_seq_len + 1)
             tokens = torch.cat([tokens, next_token], dim=1)
-            
-            # Stop if we hit end token
-            if (next_token == self.tokenizer.encode(END_TOKEN, add_special_tokens=False)[0]).any():
-                break
         
         return tokens
 
