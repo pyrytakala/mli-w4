@@ -5,7 +5,7 @@ import torch
 import random
 from constants import (
     IMAGE_SIZE, IMAGE_MEAN, IMAGE_STD, DEFAULT_BATCH_SIZE, 
-    DEFAULT_TRAIN_SPLIT, MAX_SEQUENCE_LENGTH
+    DEFAULT_TRAIN_SPLIT, MAX_SEQUENCE_LENGTH, START_TOKEN, END_TOKEN
 )
 
 def flickr_collate_fn(batch, tokenizer, max_length: int = MAX_SEQUENCE_LENGTH):
@@ -28,6 +28,9 @@ def flickr_collate_fn(batch, tokenizer, max_length: int = MAX_SEQUENCE_LENGTH):
     
     # Collect captions into a list of strings
     captions = [item[1] for item in batch]
+    
+    # Prepend START_TOKEN and append END_TOKEN to each caption
+    captions = [START_TOKEN + " " + caption + " " + END_TOKEN for caption in captions]
     
     # Tokenize and pad captions
     tokenized = tokenizer(
