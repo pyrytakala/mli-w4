@@ -3,10 +3,25 @@ from torch.utils.data import DataLoader, Dataset, random_split
 from torchvision import transforms
 import torch
 import random
+import numpy as np
 from constants import (
     IMAGE_SIZE, IMAGE_MEAN, IMAGE_STD, DEFAULT_BATCH_SIZE, 
-    DEFAULT_TRAIN_SPLIT, MAX_SEQUENCE_LENGTH, START_TOKEN, END_TOKEN
+    DEFAULT_TRAIN_SPLIT, MAX_SEQUENCE_LENGTH, START_TOKEN, END_TOKEN,
+    RANDOM_SEED
 )
+
+def seed_worker(worker_id):
+    """Set seed for each worker to ensure basic reproducibility.
+    
+    Note: This function only sets basic random seeds without enforcing deterministic behavior.
+    This provides a good balance between reproducibility and performance.
+    """
+    worker_seed = RANDOM_SEED + worker_id
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
+    torch.manual_seed(worker_seed)
+    # Note: We intentionally don't set cudnn.deterministic or cudnn.benchmark
+    # to maintain better performance while still having basic reproducibility
 
 def flickr_collate_fn(batch, tokenizer, max_length: int = MAX_SEQUENCE_LENGTH):
     """
@@ -87,19 +102,22 @@ def get_train_val_dataloaders(
     
     train_size = int(train_split * len(full_dataset))
     val_size = len(full_dataset) - train_size
-    train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
+    generator = torch.Generator().manual_seed(RANDOM_SEED)
+    train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size], generator=generator)
     
     train_loader = DataLoader(
         train_dataset, 
         batch_size=batch_size, 
         shuffle=True, 
-        collate_fn=lambda batch: flickr_collate_fn(batch, tokenizer, max_length)
+        collate_fn=lambda batch: flickr_collate_fn(batch, tokenizer, max_length),
+        worker_init_fn=seed_worker
     )
     val_loader = DataLoader(
         val_dataset, 
         batch_size=batch_size, 
         shuffle=False, 
-        collate_fn=lambda batch: flickr_collate_fn(batch, tokenizer, max_length)
+        collate_fn=lambda batch: flickr_collate_fn(batch, tokenizer, max_length),
+        worker_init_fn=seed_worker
     )
     
     return train_loader, val_loader

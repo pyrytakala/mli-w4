@@ -25,3 +25,6 @@ CLIP_MODEL_NAME = 'openai/clip-vit-base-patch32'
 # Tokenizer constants
 START_TOKEN = "<|startoftext|>"
 END_TOKEN = "<|endoftext|>"
+
+# Random seed for reproducibility
+RANDOM_SEED = 42

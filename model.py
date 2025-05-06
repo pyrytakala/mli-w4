@@ -21,9 +21,29 @@ import transformers
 from typing import Optional, Tuple
 from constants import (
     IMAGE_CHANNELS, IMAGE_SIZE, CLIP_HIDDEN_SIZE, EMBEDDING_SIZE,
-    NUM_HEADS, FEEDFORWARD_DIM, NUM_DECODER_LAYERS, CLIP_MODEL_NAME, START_TOKEN, END_TOKEN
+    NUM_HEADS, FEEDFORWARD_DIM, NUM_DECODER_LAYERS, CLIP_MODEL_NAME, START_TOKEN, END_TOKEN,
+    RANDOM_SEED
 )
 import os
+import random
+import numpy as np
+
+def set_seed(seed: int = RANDOM_SEED):
+    """Set random seeds for reproducibility.
+    
+    Note: This function only sets basic random seeds without enforcing deterministic behavior.
+    This provides a good balance between reproducibility and performance.
+    For full determinism (but slower performance), set:
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    # Note: We intentionally don't set cudnn.deterministic or cudnn.benchmark
+    # to maintain better performance while still having basic reproducibility
 
 class DecoderLayer(nn.Module):
     """A single decoder layer with masked self-attention and feedforward network.

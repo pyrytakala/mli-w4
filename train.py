@@ -3,12 +3,13 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 import wandb
-from model import ImageCaptionModel
+from model import ImageCaptionModel, set_seed
 from data import get_train_val_dataloaders
 from torch.utils.data import DataLoader
 from constants import (
     DEFAULT_BATCH_SIZE, DEFAULT_LEARNING_RATE, DEFAULT_NUM_EPOCHS,
-    MAX_SEQUENCE_LENGTH, VALIDATION_FREQUENCY, IMAGE_MEAN, IMAGE_STD
+    MAX_SEQUENCE_LENGTH, VALIDATION_FREQUENCY, IMAGE_MEAN, IMAGE_STD,
+    RANDOM_SEED
 )
 import base64
 from io import BytesIO
@@ -226,6 +227,9 @@ def train_epoch(
     return total_loss / total_tokens
 
 def main():
+    # Set random seeds for reproducibility
+    set_seed(RANDOM_SEED)
+    
     # Initialize wandb
     wandb.init(
         project="image-captioning",
