@@ -22,7 +22,7 @@ from typing import Optional, Tuple
 from constants import (
     IMAGE_CHANNELS, IMAGE_SIZE, CLIP_HIDDEN_SIZE, EMBEDDING_SIZE,
     NUM_HEADS, FEEDFORWARD_DIM, NUM_DECODER_LAYERS, CLIP_MODEL_NAME, START_TOKEN, END_TOKEN,
-    RANDOM_SEED
+    RANDOM_SEED, GENERATION_TEMPERATURE
 )
 import os
 import random
@@ -268,7 +268,7 @@ class ImageCaptionModel(nn.Module):
         self,
         images: torch.Tensor,
         max_length: int = 20,
-        temperature: float = 1.0
+        temperature: float = GENERATION_TEMPERATURE
     ) -> torch.Tensor:
         """
         Generate captions for images.

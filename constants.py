@@ -28,3 +28,6 @@ END_TOKEN = "<|endoftext|>"
 
 # Random seed for reproducibility
 RANDOM_SEED = 42
+
+# Generation parameters
+GENERATION_TEMPERATURE = 1.0
