@@ -8,8 +8,12 @@ from data import get_train_val_dataloaders
 from torch.utils.data import DataLoader
 from constants import (
     DEFAULT_BATCH_SIZE, DEFAULT_LEARNING_RATE, DEFAULT_NUM_EPOCHS,
-    MAX_SEQUENCE_LENGTH, VALIDATION_FREQUENCY
+    MAX_SEQUENCE_LENGTH, VALIDATION_FREQUENCY, IMAGE_MEAN, IMAGE_STD
 )
+import base64
+from io import BytesIO
+from torchvision.transforms.functional import to_pil_image
+import torchvision
 
 def log_val_examples(
     model: ImageCaptionModel,
@@ -50,20 +54,31 @@ def log_val_examples(
     ]
     
     # Create HTML table for side-by-side display
+    inv_normalize = torchvision.transforms.Normalize(
+        mean=[-m/s for m, s in zip(IMAGE_MEAN, IMAGE_STD)],
+        std=[1/s for s in IMAGE_STD]
+    )
     html_content = "<table style='width:100%'>"
     for i, (img, gt, pred) in enumerate(zip(images, ground_truth_captions, generated_captions)):
         if i >= num_examples:
             break
-        # Convert image to wandb image
-        wandb_img = wandb.Image(img.cpu())
-        # Get the image URL from wandb image
-        img_url = wandb_img.image_url
-        
+        # Denormalize image
+        img_disp = inv_normalize(img.cpu())
+        img_disp = torch.clamp(img_disp, 0, 1)
+        pil_img = to_pil_image(img_disp)
+        # Save to buffer
+        buffer = BytesIO()
+        pil_img.save(buffer, format="PNG")
+        buffer.seek(0)
+        # Encode as base64
+        img_b64 = base64.b64encode(buffer.read()).decode("utf-8")
+        # Create data URI
+        img_src = f"data:image/png;base64,{img_b64}"
         # Create table row with image and captions side by side
         html_content += f"""
         <tr>
             <td style='width:50%'>
-                <img src='{img_url}' style='max-width:100%'/>
+                <img src='{img_src}' style='max-width:100%'/>
             </td>
             <td style='width:50%; padding-left:20px; vertical-align:top'>
                 <p><strong>Generated:</strong><br>{pred}</p>
