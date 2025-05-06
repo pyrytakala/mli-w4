@@ -194,17 +194,19 @@ def train_epoch(
             "learning_rate": optimizer.param_groups[0]['lr']
         })
         
-        # Compute validation loss and examples every val_every batches
-        if val_loader is not None and (batch_idx + 1) % val_every == 0:
+        # Compute examples and validation loss every val_every batches
+        if val_loader is not None and (batch_idx) % val_every == 0:
+
+            log_val_examples(model, val_loader, device, step=batch_idx + 1)
+
             val_loss = validate_epoch(model, val_loader, criterion, device)
-            print(f"Validation Loss (batch {batch_idx + 1}): {val_loss:.4f}")
+            print(f"Validation Loss (batch {batch_idx}): {val_loss:.4f}")
             wandb.log({
                 "val_loss": val_loss,
-                "val_step": batch_idx + 1
+                "val_step": batch_idx
             })
             
-            # Log validation examples
-            log_val_examples(model, val_loader, device, step=batch_idx + 1)
+            
     
     return total_loss / total_tokens
 
