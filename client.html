@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Image Captioning Demo</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+    .preview-container {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+    }
+    #preview, #camera-preview {
+      max-width: 300px;
+      display: none;
+    }
+    #camera-preview {
+      transform: scaleX(-1); /* Mirror the camera feed */
+    }
+    #caption {
+      font-size: 1.2em;
+      font-style: italic;
+      min-height: 1.2em;
+    }
+    .upload-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: center;
+    }
+    .input-group {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .mode-toggle {
+      margin-bottom: 20px;
+    }
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Image Captioning Demo</h1>
+    
+    <div class="mode-toggle">
+      <button onclick="toggleMode('file')" id="file-mode-btn">File Upload</button>
+      <button onclick="toggleMode('camera')" id="camera-mode-btn">Camera</button>
+    </div>
+
+    <div class="upload-container">
+      <!-- File Upload Section -->
+      <div id="file-input-section" class="input-group">
+        <input type="file" id="imageInput" accept="image/*" />
+        <button onclick="uploadImage()">Get Caption</button>
+      </div>
+
+      <!-- Camera Section -->
+      <div id="camera-section" class="input-group hidden">
+        <video id="camera-preview" autoplay playsinline></video>
+        <button onclick="captureAndUpload()">Take Photo & Get Caption</button>
+      </div>
+    </div>
+
+    <div class="preview-container">
+      <img id="preview" />
+      <div>
+        <h3>Generated Caption:</h3>
+        <p id="caption"></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let stream = null;
+
+    function toggleMode(mode) {
+      const fileSection = document.getElementById('file-input-section');
+      const cameraSection = document.getElementById('camera-section');
+      const fileBtn = document.getElementById('file-mode-btn');
+      const cameraBtn = document.getElementById('camera-mode-btn');
+
+      if (mode === 'camera') {
+        fileSection.classList.add('hidden');
+        cameraSection.classList.remove('hidden');
+        fileBtn.style.backgroundColor = '#ccc';
+        cameraBtn.style.backgroundColor = '#007bff';
+        startCamera();
+      } else {
+        fileSection.classList.remove('hidden');
+        cameraSection.classList.add('hidden');
+        fileBtn.style.backgroundColor = '#007bff';
+        cameraBtn.style.backgroundColor = '#ccc';
+        stopCamera();
+      }
+    }
+
+    async function startCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            facingMode: 'user',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          } 
+        });
+        const video = document.getElementById('camera-preview');
+        video.srcObject = stream;
+        video.style.display = 'block';
+      } catch (err) {
+        console.error('Error accessing camera:', err);
+        alert('Could not access camera. Please check permissions.');
+      }
+    }
+
+    function stopCamera() {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+      }
+      const video = document.getElementById('camera-preview');
+      video.srcObject = null;
+      video.style.display = 'none';
+    }
+
+    async function captureAndUpload() {
+      const video = document.getElementById('camera-preview');
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+      
+      // Convert to blob
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
+      const formData = new FormData();
+      formData.append('file', blob, 'camera.jpg');
+
+      // Show preview
+      document.getElementById('preview').src = canvas.toDataURL('image/jpeg');
+      document.getElementById('preview').style.display = 'block';
+
+      // Show loading state
+      document.getElementById('caption').innerText = 'Generating caption...';
+
+      // Send to server
+      fetch('http://localhost:8000/caption', {
+        method: 'POST',
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('caption').innerText = data.caption;
+      })
+      .catch(err => {
+        document.getElementById('caption').innerText = 'Error: ' + err;
+      });
+    }
+
+    function uploadImage() {
+      const input = document.getElementById('imageInput');
+      if (!input.files.length) {
+        alert('Please select an image first');
+        return;
+      }
+      const file = input.files[0];
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Show preview
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('preview').src = e.target.result;
+        document.getElementById('preview').style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+
+      // Show loading state
+      document.getElementById('caption').innerText = 'Generating caption...';
+
+      fetch('http://localhost:8000/caption', {
+        method: 'POST',
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('caption').innerText = data.caption;
+      })
+      .catch(err => {
+        document.getElementById('caption').innerText = 'Error: ' + err;
+      });
+    }
+
+    // Initialize in file mode
+    toggleMode('file');
+  </script>
+</body>
+</html> 
