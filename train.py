@@ -77,12 +77,12 @@ def log_val_examples(
         # Create table row with image and captions side by side
         html_content += f"""
         <tr>
-            <td style='width:260px; padding-right:16px; vertical-align:top;'>
-                <img src='{img_src}' style='max-width:120px; display:block;'/>
+            <td style='width:300px'>
+                <img src='{img_src}' style='max-width:100%'/>
             </td>
-            <td style='vertical-align:top'>
-                <p><strong>Generated: </strong> {pred}</p>
-                <p><strong>Ground Truth: </strong> {gt}</p>
+            <td style='width:800px; padding-left:10px; vertical-align:top'>
+                <p>{pred}</p>
+                <p><i>{gt}</i></p>
             </td>
         </tr>
         """
