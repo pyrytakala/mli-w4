@@ -7,6 +7,8 @@ import torch
 from PIL import Image
 import io
 import torchvision.transforms as transforms
+import glob
+import os
 
 app = FastAPI()
 
@@ -18,8 +20,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def get_latest_checkpoint():
+    """Find the latest model checkpoint."""
+    checkpoints = glob.glob("model_epoch_*.pth")
+    if not checkpoints:
+        return None
+    # Sort by epoch number
+    latest = max(checkpoints, key=lambda x: int(x.split('_')[-1].split('.')[0]))
+    return latest
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = ImageCaptionModel().to(device)
+
+# Load latest checkpoint if available
+latest_checkpoint = get_latest_checkpoint()
+if latest_checkpoint:
+    print(f"Loading model from {latest_checkpoint}")
+    model.load_state_dict(torch.load(latest_checkpoint, map_location=device))
+else:
+    print("No checkpoint found, using untrained model")
+
 model.eval()
 
 # Preprocessing (should match your training)
