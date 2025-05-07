@@ -10,6 +10,7 @@ EMBEDDING_SIZE = 512  # word embedding (from CLIP)
 NUM_HEADS = 8
 FEEDFORWARD_DIM = 512
 NUM_DECODER_LAYERS = 6
+DROPOUT_RATE = 0.2  # Dropout rate for decoder layers
 
 # Training constants
 DEFAULT_BATCH_SIZE = 32

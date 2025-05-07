@@ -22,7 +22,7 @@ from typing import Optional, Tuple
 from constants import (
     IMAGE_CHANNELS, IMAGE_SIZE, CLIP_HIDDEN_SIZE, EMBEDDING_SIZE,
     NUM_HEADS, FEEDFORWARD_DIM, NUM_DECODER_LAYERS, CLIP_MODEL_NAME, START_TOKEN, END_TOKEN,
-    RANDOM_SEED, GENERATION_TEMPERATURE, PAD_TOKEN
+    RANDOM_SEED, GENERATION_TEMPERATURE, PAD_TOKEN, DROPOUT_RATE
 )
 import os
 import random
@@ -61,7 +61,7 @@ class DecoderLayer(nn.Module):
         d_model: int,
         nhead: int,
         dim_feedforward: int = 2048,
-        dropout: float = 0.1,
+        dropout: float = DROPOUT_RATE,
         activation: str = "relu",
         layer_norm_eps: float = 1e-5,
         batch_first: bool = True,
