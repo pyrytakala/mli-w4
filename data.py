@@ -45,7 +45,6 @@ def flickr_collate_fn(batch, tokenizer, max_length: int = MAX_SEQUENCE_LENGTH):
     captions = [item[1] for item in batch]
     
     captions = [START_TOKEN + " " + caption + " " + END_TOKEN for caption in captions]
-    
     # Tokenize and pad captions
     tokenized = tokenizer(
         captions,
@@ -92,12 +91,29 @@ def get_flickr_dataloader(batch_size=DEFAULT_BATCH_SIZE, tokenizer=None, max_len
         collate_fn=lambda batch: flickr_collate_fn(batch, tokenizer, max_length)
     )
 
+def get_environment_config():
+    """Detect environment and return appropriate DataLoader configuration."""
+    if torch.cuda.is_available():
+        # GPU environment
+        return {
+            'num_workers': 4,
+            'pin_memory': True,
+            'persistent_workers': True
+        }
+    else:
+        # CPU/Mac environment
+        return {
+            'num_workers': 0,
+            'pin_memory': False,
+            'persistent_workers': False
+        }
+
 def get_train_val_dataloaders(
     batch_size=DEFAULT_BATCH_SIZE, 
     train_split=DEFAULT_TRAIN_SPLIT, 
     tokenizer=None, 
     max_length: int = MAX_SEQUENCE_LENGTH,
-    num_workers: int = 4
+    num_workers: int = None  # Will be set automatically if None
 ):
     full_dataset = get_flickr_dataloader(batch_size=1, tokenizer=tokenizer, max_length=max_length).dataset
     
@@ -106,24 +122,33 @@ def get_train_val_dataloaders(
     generator = torch.Generator().manual_seed(RANDOM_SEED)
     train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size], generator=generator)
     
+    # Get environment-specific configuration
+    env_config = get_environment_config()
+    if num_workers is not None:
+        env_config['num_workers'] = num_workers
+    
+    # Create partial functions for collate_fn
+    from functools import partial
+    collate_fn = partial(flickr_collate_fn, tokenizer=tokenizer, max_length=max_length)
+    
     train_loader = DataLoader(
         train_dataset, 
         batch_size=batch_size, 
         shuffle=True, 
-        collate_fn=lambda batch: flickr_collate_fn(batch, tokenizer, max_length),
+        collate_fn=collate_fn,
         worker_init_fn=seed_worker,
-        num_workers=num_workers,
-        pin_memory=True,
-        persistent_workers=True
+        num_workers=env_config['num_workers'],
+        pin_memory=env_config['pin_memory'],
+        persistent_workers=env_config['persistent_workers']
     )
     val_loader = DataLoader(
         val_dataset, 
         batch_size=batch_size, 
         shuffle=False, 
-        collate_fn=lambda batch: flickr_collate_fn(batch, tokenizer, max_length),
+        collate_fn=collate_fn,
         worker_init_fn=seed_worker,
-        num_workers=num_workers,
-        pin_memory=True
+        num_workers=env_config['num_workers'],
+        pin_memory=env_config['pin_memory']
     )
     
     return train_loader, val_loader
