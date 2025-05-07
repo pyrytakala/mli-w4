@@ -102,7 +102,7 @@ def validate_epoch(
     dataloader: DataLoader,
     criterion: nn.Module,
     device: torch.device,
-    max_batches: int = 20  # Limit validation to 20 batches
+    max_batches: int = 10  # Limit validation to 10 batches
 ) -> float:
     """Evaluate on validation set."""
     model.eval()
