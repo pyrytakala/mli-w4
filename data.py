@@ -96,7 +96,8 @@ def get_train_val_dataloaders(
     batch_size=DEFAULT_BATCH_SIZE, 
     train_split=DEFAULT_TRAIN_SPLIT, 
     tokenizer=None, 
-    max_length: int = MAX_SEQUENCE_LENGTH
+    max_length: int = MAX_SEQUENCE_LENGTH,
+    num_workers: int = 4
 ):
     full_dataset = get_flickr_dataloader(batch_size=1, tokenizer=tokenizer, max_length=max_length).dataset
     
@@ -110,14 +111,19 @@ def get_train_val_dataloaders(
         batch_size=batch_size, 
         shuffle=True, 
         collate_fn=lambda batch: flickr_collate_fn(batch, tokenizer, max_length),
-        worker_init_fn=seed_worker
+        worker_init_fn=seed_worker,
+        num_workers=num_workers,
+        pin_memory=True,
+        persistent_workers=True
     )
     val_loader = DataLoader(
         val_dataset, 
         batch_size=batch_size, 
         shuffle=False, 
         collate_fn=lambda batch: flickr_collate_fn(batch, tokenizer, max_length),
-        worker_init_fn=seed_worker
+        worker_init_fn=seed_worker,
+        num_workers=num_workers,
+        pin_memory=True
     )
     
     return train_loader, val_loader

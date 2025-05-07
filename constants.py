@@ -8,7 +8,7 @@ IMAGE_STD = [0.26862954, 0.26130258, 0.27577711]
 CLIP_HIDDEN_SIZE = 768  # hidden size of CLIP image model (from CLIP)
 EMBEDDING_SIZE = 512  # word embedding (from CLIP)
 NUM_HEADS = 8
-FEEDFORWARD_DIM = 2048
+FEEDFORWARD_DIM = 512
 NUM_DECODER_LAYERS = 6
 
 # Training constants
