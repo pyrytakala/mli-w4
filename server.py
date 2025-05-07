@@ -22,7 +22,7 @@ app.add_middleware(
 
 def get_latest_checkpoint():
     """Find the latest model checkpoint."""
-    checkpoints = glob.glob("model_epoch_*.pth")
+    checkpoints = glob.glob(os.path.join("checkpoints", "epoch_*.pth"))
     if not checkpoints:
         return None
     # Sort by epoch number

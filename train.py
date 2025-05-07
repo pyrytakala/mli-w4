@@ -15,6 +15,7 @@ import base64
 from io import BytesIO
 from torchvision.transforms.functional import to_pil_image
 import torchvision
+import os
 
 def log_val_examples(
     model: ImageCaptionModel,
@@ -283,7 +284,8 @@ def main():
         log_val_examples(model, val_loader, device, step=(epoch + 1) * len(train_loader))
 
         # Save the model at the end of each epoch
-        model_path = f"model_epoch_{epoch+1}.pth"
+        os.makedirs("checkpoints", exist_ok=True)  # Create checkpoints directory if it doesn't exist
+        model_path = os.path.join("checkpoints", f"epoch_{epoch+1}.pth")
         torch.save(model.state_dict(), model_path)
         wandb.save(model_path)
     
