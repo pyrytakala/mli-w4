@@ -307,6 +307,8 @@ def main():
             'optimizer_state_dict': optimizer.state_dict(),
             'train_loss': train_loss
         }
+        # Create checkpoints directory if it doesn't exist
+        os.makedirs("checkpoints", exist_ok=True)
         model_path = os.path.join("checkpoints", f"epoch_{epoch+1}.pth")
         torch.save(checkpoint, model_path)
         wandb.save(model_path)
