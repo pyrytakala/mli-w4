@@ -12,11 +12,11 @@ apt update && apt install -y tmux vim
 pip install -r requirements.txt
 tmux
 python train.py
+python upload.py
 ```
 
 # Deploy
 ```bash
-scp -C computa:~/checkpoints/epoch_20.pth checkpoints/.
-python server.py
+uvicorn server:app --reload
 open client.html
 ``` 

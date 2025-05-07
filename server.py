@@ -9,6 +9,7 @@ import io
 import torchvision.transforms as transforms
 import glob
 import os
+import wandb
 
 app = FastAPI()
 
@@ -29,6 +30,23 @@ def get_latest_checkpoint():
     latest = max(checkpoints, key=lambda x: int(x.split('_')[-1].split('.')[0]))
     return latest
 
+def download_wandb_checkpoint():
+    """Download checkpoint from wandb if no local checkpoint exists."""
+    try:
+        # Initialize wandb
+        api = wandb.Api()
+        # Get the artifact
+        artifact = api.artifact('image-captioning/model_checkpoint:latest')
+        # Create checkpoints directory if it doesn't exist
+        os.makedirs("checkpoints", exist_ok=True)
+        # Download the artifact
+        artifact.download(root="checkpoints")
+        print("Successfully downloaded checkpoint from wandb")
+        return os.path.join("checkpoints", "epoch_100.pth")
+    except Exception as e:
+        print(f"Failed to download checkpoint from wandb: {e}")
+        return None
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = ImageCaptionModel().to(device)
 
@@ -40,7 +58,15 @@ if latest_checkpoint:
     model.load_state_dict(checkpoint['model_state_dict'])  # Only load the model state
     print(f"Loaded checkpoint from epoch {checkpoint['epoch']}")
 else:
-    print("No checkpoint found, using untrained model")
+    print("No local checkpoint found, attempting to download from wandb...")
+    wandb_checkpoint = download_wandb_checkpoint()
+    if wandb_checkpoint:
+        print(f"Loading model from wandb checkpoint {wandb_checkpoint}")
+        checkpoint = torch.load(wandb_checkpoint, map_location=device)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        print(f"Loaded checkpoint from epoch {checkpoint['epoch']}")
+    else:
+        print("No checkpoint found, using untrained model")
 
 model.eval()
 

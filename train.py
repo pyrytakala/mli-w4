@@ -256,6 +256,10 @@ def main():
     # Create model
     model = ImageCaptionModel().to(device)
     
+    # Create optimizer and criterion
+    optimizer = optim.AdamW(model.parameters(), lr=DEFAULT_LEARNING_RATE)
+    criterion = nn.CrossEntropyLoss(ignore_index=model.tokenizer.pad_token_id)
+    
     # Load checkpoint if specified
     start_epoch = 0
     if args.resume:
@@ -275,10 +279,6 @@ def main():
         tokenizer=model.tokenizer,
         max_length=MAX_SEQUENCE_LENGTH
     )
-    
-    # Create optimizer and criterion
-    optimizer = optim.AdamW(model.parameters(), lr=DEFAULT_LEARNING_RATE)
-    criterion = nn.CrossEntropyLoss(ignore_index=model.tokenizer.pad_token_id)
     
     # Training loop
     for epoch in range(start_epoch, DEFAULT_NUM_EPOCHS):

@@ -15,7 +15,7 @@ NUM_DECODER_LAYERS = 6
 DEFAULT_BATCH_SIZE = 32
 DEFAULT_TRAIN_SPLIT = 0.8
 DEFAULT_LEARNING_RATE = 1e-4
-DEFAULT_NUM_EPOCHS = 20
+DEFAULT_NUM_EPOCHS = 100
 MAX_SEQUENCE_LENGTH = 77  # Total sequence length including image patches and caption tokens
 VALIDATION_FREQUENCY = 1000  # Validate and log examples every 100 minibatches
 
