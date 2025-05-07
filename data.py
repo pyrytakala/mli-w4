@@ -51,7 +51,8 @@ def flickr_collate_fn(batch, tokenizer, max_length: int = MAX_SEQUENCE_LENGTH):
         padding=True,
         return_tensors="pt",
         truncation=True,
-        max_length=max_length
+        max_length=max_length,
+        pad_to_multiple_of=1  # Ensure consistent padding
     )
     
     return images, tokenized.input_ids, tokenized.attention_mask

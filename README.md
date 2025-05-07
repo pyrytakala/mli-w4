@@ -1,9 +1,7 @@
-Run tests:
+# Run tests
 `python test_data.py`
 
-Train
-`python train.py`
-
+# Train
 Start machine and update its IP https://computa.mlx.institute/
 `open ~/.ssh/config`
 `scp -C * computa:~/`
@@ -15,3 +13,10 @@ pip install -r requirements.txt
 tmux
 python train.py
 ```
+
+# Deploy
+```bash
+scp -C computa:~/checkpoints/epoch_20.pth checkpoints/.
+python server.py
+open client.html
+``` 

@@ -22,7 +22,7 @@ from typing import Optional, Tuple
 from constants import (
     IMAGE_CHANNELS, IMAGE_SIZE, CLIP_HIDDEN_SIZE, EMBEDDING_SIZE,
     NUM_HEADS, FEEDFORWARD_DIM, NUM_DECODER_LAYERS, CLIP_MODEL_NAME, START_TOKEN, END_TOKEN,
-    RANDOM_SEED, GENERATION_TEMPERATURE
+    RANDOM_SEED, GENERATION_TEMPERATURE, PAD_TOKEN
 )
 import os
 import random
@@ -164,6 +164,35 @@ class ImageCaptionModel(nn.Module):
         self.text_encoder = self.clip_model.text_model
         self.text_embeddings = self.text_encoder.embeddings
         
+        # Initialize tokenizer and add padding token
+        self.tokenizer = transformers.CLIPTokenizer.from_pretrained(clip_model_name)
+        self.tokenizer.pad_token = PAD_TOKEN
+        
+        # Update special tokens dictionary
+        special_tokens = self.tokenizer.special_tokens_map
+        special_tokens['pad_token'] = PAD_TOKEN
+        self.tokenizer.add_special_tokens(special_tokens)
+        
+        # Add padding token to embeddings
+        old_embedding = self.text_embeddings.token_embedding
+        new_embedding = nn.Embedding(
+            old_embedding.num_embeddings + 1,  # +1 for new padding token
+            old_embedding.embedding_dim,
+            padding_idx=old_embedding.num_embeddings  # Set padding_idx to the new token's index
+        )
+        
+        # Copy old embeddings
+        new_embedding.weight.data[:-1] = old_embedding.weight.data
+        
+        # Initialize padding token embedding as zeros
+        new_embedding.weight.data[-1] = torch.zeros_like(new_embedding.weight.data[-1])
+        
+        # Replace old embedding with new one
+        self.text_embeddings.token_embedding = new_embedding
+        
+        # Update tokenizer's pad_token_id
+        self.tokenizer.pad_token_id = old_embedding.num_embeddings
+        
         self.decoder = Decoder(
             decoder_layer=DecoderLayer(
                 d_model=EMBEDDING_SIZE,
@@ -175,10 +204,25 @@ class ImageCaptionModel(nn.Module):
         )
         
         # Output layer: project from embedding dim to vocab size
-        vocab_size = self.text_embeddings.token_embedding.weight.shape[0]
-        self.output_layer = nn.Linear(EMBEDDING_SIZE, vocab_size)
-        
-        self.tokenizer = transformers.CLIPTokenizer.from_pretrained(clip_model_name)
+        old_vocab_size = self.text_embeddings.token_embedding.weight.shape[0] - 1  # -1 because we added the padding token
+        new_vocab_size = old_vocab_size + 1  # +1 for the new padding token
+
+        # Create initial output layer
+        self.output_layer = nn.Linear(EMBEDDING_SIZE, old_vocab_size)
+
+        # Create new output layer with extended vocabulary size
+        new_output_layer = nn.Linear(EMBEDDING_SIZE, new_vocab_size)
+
+        # Copy old weights and biases
+        new_output_layer.weight.data[:-1] = self.output_layer.weight.data
+        new_output_layer.bias.data[:-1] = self.output_layer.bias.data
+
+        # Initialize the new row in the weight matrix and bias for the padding token
+        new_output_layer.weight.data[-1] = torch.zeros_like(new_output_layer.weight.data[-1])
+        new_output_layer.bias.data[-1] = torch.zeros_like(new_output_layer.bias.data[-1])
+
+        # Replace old output layer with new one
+        self.output_layer = new_output_layer
         
     def encode_image(self, images: torch.Tensor) -> torch.Tensor:
         """
