@@ -36,7 +36,9 @@ model = ImageCaptionModel().to(device)
 latest_checkpoint = get_latest_checkpoint()
 if latest_checkpoint:
     print(f"Loading model from {latest_checkpoint}")
-    model.load_state_dict(torch.load(latest_checkpoint, map_location=device))
+    checkpoint = torch.load(latest_checkpoint, map_location=device)
+    model.load_state_dict(checkpoint['model_state_dict'])  # Only load the model state
+    print(f"Loaded checkpoint from epoch {checkpoint['epoch']}")
 else:
     print("No checkpoint found, using untrained model")
 

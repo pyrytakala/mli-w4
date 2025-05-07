@@ -16,6 +16,7 @@ from io import BytesIO
 from torchvision.transforms.functional import to_pil_image
 import torchvision
 import os
+import argparse
 
 def log_val_examples(
     model: ImageCaptionModel,
@@ -228,6 +229,11 @@ def train_epoch(
     return total_loss / total_tokens
 
 def main():
+    # Add argument parsing
+    parser = argparse.ArgumentParser(description='Train image captioning model')
+    parser.add_argument('--resume', type=str, help='Path to checkpoint file to resume from')
+    args = parser.parse_args()
+
     # Set random seeds for reproducibility
     set_seed(RANDOM_SEED)
     
@@ -239,7 +245,8 @@ def main():
             "learning_rate": DEFAULT_LEARNING_RATE,
             "num_epochs": DEFAULT_NUM_EPOCHS,
             "max_sequence_length": MAX_SEQUENCE_LENGTH
-        }
+        },
+        resume="allow"  # Enable wandb resuming
     )
     
     # Set device
@@ -248,6 +255,16 @@ def main():
     
     # Create model
     model = ImageCaptionModel().to(device)
+    
+    # Load checkpoint if specified
+    start_epoch = 0
+    if args.resume:
+        print(f"Loading checkpoint from {args.resume}")
+        checkpoint = torch.load(args.resume)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        start_epoch = checkpoint['epoch']
+        print(f"Resuming from epoch {start_epoch}")
     
     # Log model architecture
     wandb.watch(model)
@@ -264,7 +281,7 @@ def main():
     criterion = nn.CrossEntropyLoss(ignore_index=model.tokenizer.pad_token_id)
     
     # Training loop
-    for epoch in range(DEFAULT_NUM_EPOCHS):
+    for epoch in range(start_epoch, DEFAULT_NUM_EPOCHS):
         print(f"\nEpoch {epoch + 1}/{DEFAULT_NUM_EPOCHS}")
         
         # Train
@@ -283,10 +300,15 @@ def main():
         # Log validation examples at the end of each epoch
         log_val_examples(model, val_loader, device, step=(epoch + 1) * len(train_loader))
 
-        # Save the model at the end of each epoch
-        os.makedirs("checkpoints", exist_ok=True)  # Create checkpoints directory if it doesn't exist
+        # Save the model and optimizer state
+        checkpoint = {
+            'epoch': epoch + 1,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'train_loss': train_loss
+        }
         model_path = os.path.join("checkpoints", f"epoch_{epoch+1}.pth")
-        torch.save(model.state_dict(), model_path)
+        torch.save(checkpoint, model_path)
         wandb.save(model_path)
     
     # Finish wandb run
